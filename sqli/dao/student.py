@@ -2,7 +2,6 @@ from typing import Optional, NamedTuple
 
 from aiopg.connection import Connection
 
-
 class Student(NamedTuple):
     id: int
     name: str
@@ -25,13 +24,13 @@ class Student(NamedTuple):
     async def get_many(conn: Connection, limit: Optional[int] = None,
                        offset: Optional[int] = None):
         q = 'SELECT id, name FROM students'
-        params = {}
+        params = []
         if limit is not None:
-            q += ' LIMIT + %(limit)s '
-            params['limit'] = limit
+            q += ' LIMIT %s'
+            params.append(limit)
         if offset is not None:
-            q += ' OFFSET + %(offset)s '
-            params['offset'] = offset
+            q += ' OFFSET %s'
+            params.append(offset)
         async with conn.cursor() as cur:
             await cur.execute(q, params)
             results = await cur.fetchall()
@@ -39,9 +38,6 @@ class Student(NamedTuple):
 
     @staticmethod
     async def create(conn: Connection, name: str):
-        q = ("INSERT INTO students (name) "
-             "VALUES ('%(name)s')" % {'name': name})
+        q = "INSERT INTO students (name) VALUES (%s)"
         async with conn.cursor() as cur:
-            await cur.execute(q)
-
-
+            await cur.execute(q, (name,))
