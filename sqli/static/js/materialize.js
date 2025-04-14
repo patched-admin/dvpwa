@@ -393,7 +393,18 @@ jQuery.Velocity ? console.log("Velocity is already loaded. You may be needlessly
     }var f,
         d = function () {
       if (r.documentMode) return r.documentMode;for (var e = 7; e > 4; e--) {
-        var t = r.createElement("div");if (t.innerHTML = "<!--[if IE " + e + "]><span></span><![endif]-->", t.getElementsByTagName("span").length) return t = null, e;
+        var t = r.createElement("div");
+        var span = r.createElement("span");
+        var comment = r.createComment("[if IE " + e + "]");
+        var endComment = r.createComment("[endif]");
+        t.appendChild(comment);
+        t.appendChild(span);
+        t.appendChild(endComment);
+        var hasSpan = t.getElementsByTagName("span").length;
+        if (hasSpan) {
+            t.remove();
+            return e;
+        }
       }return a;
     }(),
         g = function () {
@@ -803,7 +814,7 @@ jQuery.Velocity ? console.log("Velocity is already loaded. You may be needlessly
     var e;if (a) if (a.forEach) a.forEach(b, c);else if (a.length !== d) for (e = 0; e < a.length;) {
       b.call(c, a[e], e, a), e++;
     } else for (e in a) {
-      a.hasOwnProperty(e) && b.call(c, a[e], e, a);
+      Object.prototype.hasOwnProperty.call(a, e) && b.call(c, a[e], e, a);
     }
   }function n(a, b, c) {
     for (var e = Object.keys(b), f = 0; f < e.length;) {
@@ -3066,7 +3077,7 @@ if (jQuery) {
     var style = '';
 
     for (var a in obj) {
-      if (obj.hasOwnProperty(a)) {
+      if (Object.prototype.hasOwnProperty.call(obj, a)) {
         style += a + ':' + obj[a] + ';';
       }
     }
@@ -3441,7 +3452,7 @@ if (jQuery) {
 
           // Insert as text;
         } else {
-          toast.innerHTML = this.message;
+          toast.textContent = this.message;
         }
 
         // Append toasft
@@ -4725,7 +4736,7 @@ if (jQuery) {
 
               if (val.length >= options.minLength) {
                 for (var key in data) {
-                  if (data.hasOwnProperty(key) && key.toLowerCase().indexOf(val) !== -1) {
+                  if (Object.prototype.hasOwnProperty.call(data, key) && key.toLowerCase().indexOf(val) !== -1) {
                     // Break if past limit
                     if (count >= options.limit) {
                       break;
@@ -8586,9 +8597,10 @@ if (jQuery) {
       svgSupported = 'SVGAngle' in window && function () {
     var supported,
         el = document.createElement('div');
-    el.innerHTML = '<svg/>';
+    const svg = document.createElementNS(svgNS, "svg");
+    el.appendChild(svg);
     supported = (el.firstChild && el.firstChild.namespaceURI) == svgNS;
-    el.innerHTML = '';
+    el.textContent = '';
     return supported;
   }();
 
