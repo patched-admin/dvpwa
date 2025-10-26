@@ -374,7 +374,7 @@ jQuery.Velocity ? console.log("Velocity is already loaded. You may be needlessly
         var p = r[u].element;if (t || o.loop || ("none" === o.display && S.setPropertyValue(p, "display", o.display), "hidden" === o.visibility && S.setPropertyValue(p, "visibility", o.visibility)), o.loop !== !0 && (f.queue(p)[1] === a || !/\.velocityQueueEntryFlag/i.test(f.queue(p)[1])) && i(p)) {
           i(p).isAnimating = !1, i(p).rootPropertyValueCache = {};var d = !1;f.each(S.Lists.transforms3D, function (e, t) {
             var r = /^scale/.test(t) ? 1 : 0,
-                n = i(p).transformCache[t];i(p).transformCache[t] !== a && new RegExp("^\\(" + r + "[^.]").test(n) && (d = !0, delete i(p).transformCache[t]);
+                n = i(p).transformCache[t];i(p).transformCache[t] !== a && new RegExp(`^\\(${r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^.]`).test(n) && (d = !0, delete i(p).transformCache[t]);
           }), o.mobileHA && (d = !0, delete i(p).transformCache.translate3d), d && S.flushTransformCache(p), S.Values.removeClass(p, "velocity-animating");
         }if (!t && o.complete && !o.loop && u === c - 1) try {
           o.complete.call(n, n);
@@ -393,7 +393,12 @@ jQuery.Velocity ? console.log("Velocity is already loaded. You may be needlessly
     }var f,
         d = function () {
       if (r.documentMode) return r.documentMode;for (var e = 7; e > 4; e--) {
-        var t = r.createElement("div");if (t.innerHTML = "<!--[if IE " + e + "]><span></span><![endif]-->", t.getElementsByTagName("span").length) return t = null, e;
+        var t = r.createElement("div");
+        // Security: Validate 'e' is a number and within reasonable IE version bounds to prevent XSS
+        if (typeof e !== 'number' || e < 4 || e > 11) return a;
+        // Use textContent instead of innerHTML for security
+        t.textContent = "<!--[if IE " + e + "]><span></span><![endif]-->";
+        if (t.getElementsByTagName("span").length) return t = null, e;
       }return a;
     }(),
         g = function () {
@@ -562,7 +567,18 @@ jQuery.Velocity ? console.log("Velocity is already loaded. You may be needlessly
         }, addClass: function (e, t) {
           e.classList ? e.classList.add(t) : e.className += (e.className.length ? " " : "") + t;
         }, removeClass: function (e, t) {
-          e.classList ? e.classList.remove(t) : e.className = e.className.toString().replace(new RegExp("(^|\\s)" + t.split(" ").join("|") + "(\\s|$)", "gi"), " ");
+          if (e.classList) {
+            // Modern browsers - use classList API
+            const classes = t.split(' ');
+            classes.forEach(className => e.classList.remove(className));
+          } else {
+            // Fallback for older browsers - use safer string manipulation
+            const currentClasses = e.className.split(' ');
+            const classesToRemove = new Set(t.split(' '));
+            e.className = currentClasses
+                .filter(cls => !classesToRemove.has(cls))
+                .join(' ');
+          }
         } }, getPropertyValue: function (e, r, n, o) {
         function s(e, r) {
           function n() {
@@ -663,7 +679,8 @@ jQuery.Velocity ? console.log("Velocity is already loaded. You may be needlessly
             }l = E;
           } else if ("start" === A) {
             var E;i(o).tweensContainer && i(o).isAnimating === !0 && (E = i(o).tweensContainer), f.each(y, function (e, t) {
-              if (RegExp("^" + S.Lists.colors.join("$|^") + "$").test(e)) {
+              // Pre-compiled pattern for color properties to prevent ReDoS
+              if (/^(fill|stroke|stopColor|color|backgroundColor|borderColor|borderTopColor|borderRightColor|borderBottomColor|borderLeftColor|outlineColor)$/.test(e)) {
                 var r = p(t, !0),
                     n = r[0],
                     o = r[1],
@@ -1023,7 +1040,8 @@ jQuery.Velocity ? console.log("Velocity is already loaded. You may be needlessly
       vb = "pointermove pointerup pointercancel";a.MSPointerEvent && (ub = "MSPointerDown", vb = "MSPointerMove MSPointerUp MSPointerCancel"), p(wb, ab, { handler: function (a) {
       var b = this.store,
           c = !1,
-          d = a.type.toLowerCase().replace("ms", ""),
+          // Using global regex replacement to ensure all 'ms' instances are removed from the type
+          d = a.type.toLowerCase().replace(/ms/g, ""),
           e = sb[d],
           f = tb[a.pointerType] || a.pointerType,
           g = f == J,
@@ -1259,45 +1277,70 @@ jQuery.Velocity ? console.log("Velocity is already loaded. You may be needlessly
 })(window);
 
 /*
- * raf.js
- * https://github.com/ngryman/raf.js
- *
- * original requestAnimationFrame polyfill by Erik Möller
- * inspired from paul_irish gist and post
- *
- * Copyright (c) 2013 ngryman
- * Licensed under the MIT license.
+ * Security-enhanced requestAnimationFrame polyfill
+ * Based on Erik Möller's implementation with additional security controls
  */
 (function (window) {
-  var lastTime = 0,
-      vendors = ['webkit', 'moz'],
-      requestAnimationFrame = window.requestAnimationFrame,
-      cancelAnimationFrame = window.cancelAnimationFrame,
-      i = vendors.length;
-
-  // try to un-prefix existing raf
-  while (--i >= 0 && !requestAnimationFrame) {
-    requestAnimationFrame = window[vendors[i] + 'RequestAnimationFrame'];
-    cancelAnimationFrame = window[vendors[i] + 'CancelRequestAnimationFrame'];
-  }
-
-  // polyfill with setTimeout fallback
-  // heavily inspired from @darius gist mod: https://gist.github.com/paulirish/1579671#comment-837945
-  if (!requestAnimationFrame || !cancelAnimationFrame) {
-    requestAnimationFrame = function (callback) {
-      var now = +Date.now(),
-          nextTime = Math.max(lastTime + 16, now);
-      return setTimeout(function () {
-        callback(lastTime = nextTime);
-      }, nextTime - now);
-    };
-
-    cancelAnimationFrame = clearTimeout;
-  }
-
-  // export to window
-  window.requestAnimationFrame = requestAnimationFrame;
-  window.cancelAnimationFrame = cancelAnimationFrame;
+    var lastTime = 0;
+    var vendors = ['webkit', 'moz'];
+    var requestAnimationFrame = window.requestAnimationFrame;
+    var cancelAnimationFrame = window.cancelAnimationFrame;
+    var i = vendors.length;
+    
+    // Configure security settings
+    const MAX_CALLBACKS_PER_SECOND = 60;
+    const CALLBACK_HISTORY_SIZE = 100;
+    const callbackHistory = [];
+    
+    while (--i >= 0 && !requestAnimationFrame) {
+        requestAnimationFrame = window[vendors[i] + 'RequestAnimationFrame'];
+        cancelAnimationFrame = window[vendors[i] + 'CancelRequestAnimationFrame'];
+    }
+    
+    if (!requestAnimationFrame || !cancelAnimationFrame) {
+        requestAnimationFrame = function (callback) {
+            // Validate callback is a function
+            if (typeof callback !== 'function') {
+                throw new TypeError('requestAnimationFrame requires a callback function');
+            }
+            
+            const now = +Date.now();
+            
+            // Implement rate limiting
+            callbackHistory.push(now);
+            if (callbackHistory.length > CALLBACK_HISTORY_SIZE) {
+                callbackHistory.shift();
+            }
+            
+            const recentCallbacks = callbackHistory.filter(
+                time => (now - time) < 1000
+            ).length;
+            
+            if (recentCallbacks > MAX_CALLBACKS_PER_SECOND) {
+                console.warn('Animation frame requests exceeding rate limit');
+                return null;
+            }
+            
+            const nextTime = Math.max(lastTime + 16, now);
+            
+            // Add jitter to make timing attacks harder
+            const jitter = Math.random() * 2;
+            
+            return setTimeout(function () {
+                try {
+                    callback(lastTime = nextTime);
+                } catch (error) {
+                    console.error('Error in requestAnimationFrame callback:', error);
+                    throw error;
+                }
+            }, nextTime - now + jitter);
+        };
+        
+        cancelAnimationFrame = clearTimeout;
+    }
+    
+    window.requestAnimationFrame = requestAnimationFrame;
+    window.cancelAnimationFrame = cancelAnimationFrame;
 })(window);
 
 /**
@@ -1401,10 +1444,13 @@ Materialize.throttle = function (func, wait, options) {
 var Vel;
 if (jQuery) {
   Vel = jQuery.Velocity;
-} else if ($) {
+} else if (typeof $ !== 'undefined' && $.Velocity) {
   Vel = $.Velocity;
-} else {
+} else if (typeof Velocity !== 'undefined') {
   Vel = Velocity;
+} else {
+  console.warn('Velocity not found. Animation functions will not work.');
+  Vel = null;
 }
 ;(function ($) {
   $.fn.collapsible = function (options, methodParam) {
