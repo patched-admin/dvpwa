@@ -1,5 +1,6 @@
-from hashlib import md5
 from typing import NamedTuple, Optional
+import os
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 from aiopg import Connection
 
@@ -37,5 +38,33 @@ class User(NamedTuple):
             )
             return User.from_raw(await cur.fetchone())
 
-    def check_password(self, password: str):
-        return self.pwd_hash == md5(password.encode('utf-8')).hexdigest()
+    @staticmethod
+    def hash_password(password: str) -> str:
+        salt = os.urandom(16)
+        kdf = Scrypt(
+            salt=salt,
+            length=32,
+            n=2**14,
+            r=8,
+            p=1,
+        )
+        hash = kdf.derive(password.encode('utf-8'))
+        return f"{salt.hex()}${hash.hex()}"
+
+    def check_password(self, password: str) -> bool:
+        try:
+            salt_str, hash_str = self.pwd_hash.split('$')
+            salt = bytes.fromhex(salt_str)
+            stored_hash = bytes.fromhex(hash_str)
+            
+            kdf = Scrypt(
+                salt=salt,
+                length=32,
+                n=2**14,
+                r=8,
+                p=1,
+            )
+            kdf.verify(password.encode('utf-8'), stored_hash)
+            return True
+        except:
+            return False
